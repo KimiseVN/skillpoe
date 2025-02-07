@@ -1,74 +1,77 @@
 import os
 import discord
-import openai
 import requests
-from io import BytesIO
 from discord.ext import commands
+import openai
+from dotenv import load_dotenv
 
-# Lấy Token từ biến môi trường
-TOKEN = os.getenv("DISCORD_POESKILL_BOT_TOKEN")  
-OPENAI_API_KEY = os.getenv("CHATGPT_API_KEY")
+# Load biến môi trường
+load_dotenv()
 
-# ID của kênh được phép bot hoạt động
-ALLOWED_CHANNEL_ID = 1337325317328736308  
-
-# Thiết lập intents cho bot
-intents = discord.Intents.default()
-intents.message_content = True
-
-# Khởi tạo bot với prefix "!"
-bot = commands.Bot(command_prefix="!", intents=intents)
+# Lấy các biến môi trường
+TOKEN = os.getenv("DISCORD_POESKILL_BOT_TOKEN")
+CHATGPT_API_KEY = os.getenv("CHATGPT_API_KEY")
+OPENAI_ORGANIZATION = os.getenv("OPENAI_ORGANIZATION")
+ALLOWED_CHANNEL_ID = int(os.getenv("ALLOWED_CHANNEL_ID"))
 
 # Cấu hình OpenAI API
-client = openai.OpenAI(api_key=OPENAI_API_KEY)
+openai.api_key = CHATGPT_API_KEY
+openai.organization = OPENAI_ORGANIZATION
 
+# Khởi tạo bot Discord với intents phù hợp
+intents = discord.Intents.default()
+intents.messages = True
+intents.message_content = True
+
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+# Khi bot kết nối
 @bot.event
 async def on_ready():
-    print(f'✅ POESkill Bot đã kết nối với Discord! Logged in as {bot.user}')
+    print(f"✅ Bot đã kết nối: {bot.user}")
 
+# Xử lý tin nhắn trong kênh chỉ định
 @bot.event
 async def on_message(message):
-    """Xử lý tin nhắn từ người dùng"""
     if message.author == bot.user:
         return
-    if message.channel.id != ALLOWED_CHANNEL_ID:
-        return  # Chỉ phản hồi trong kênh chỉ định
 
-    # Nếu có ảnh đính kèm, xử lý ảnh
+    if message.channel.id != ALLOWED_CHANNEL_ID:
+        return
+
+    # Nếu tin nhắn có đính kèm ảnh
     if message.attachments:
         for attachment in message.attachments:
             if attachment.filename.lower().endswith(("png", "jpg", "jpeg")):
-                await process_image(message, attachment)
+                await message.channel.send("📤 **Đang phân tích hình ảnh... Vui lòng chờ...**")
+                image_url = attachment.url
+                response_text = await analyze_image(image_url)
+                await message.channel.send(response_text)
     
+    # Xử lý lệnh bot
     await bot.process_commands(message)
 
-async def process_image(message, attachment):
-    """Tải ảnh và gửi lên ChatGPT API để phân tích"""
+# Hàm gửi ảnh lên OpenAI để phân tích
+async def analyze_image(image_url):
     try:
-        await message.channel.send("📤 Đang phân tích hình ảnh... Vui lòng chờ...")
-
-        # Tải ảnh về
-        img_data = requests.get(attachment.url).content
-        img_file = BytesIO(img_data)
-
-        # Gửi ảnh lên OpenAI API
-        response = client.chat.completions.create(
-        model="gpt-4-turbo-2024-04-09",  # 🔹 Cập nhật mô hình mới nhất
-        messages=[
-            {"role": "system", "content": "Bạn là một chuyên gia về Path of Exile 2."},
-            {"role": "user", "content": [
-                {"type": "text", "text": "Hãy phân tích nội dung trong hình ảnh này và cho biết nó liên quan đến kỹ năng, vật phẩm, hoặc cơ chế nào trong Path of Exile 2."},
-                {"type": "image_url", "image_url": {"url": attachment.url}}
-            ]}
-            ],
-        max_tokens=500
+        response = openai.ChatCompletion.create(
+            model="gpt-4-vision-preview",  # Sử dụng model có hỗ trợ hình ảnh
+            messages=[
+                {"role": "system", "content": "Bạn là trợ lý chuyên tìm kiếm thông tin về game Path of Exile 2."},
+                {"role": "user", "content": f"Hãy phân tích và cho tôi biết thông tin của hình ảnh này trong game POE2: {image_url}"}
+            ]
         )
-
-        # Trích xuất câu trả lời
-        answer = response.choices[0].message.content
-        await message.channel.send(f"🔎 **Phân tích hình ảnh:**\n{answer}")
-
+        return f"📝 **Kết quả phân tích:**\n{response['choices'][0]['message']['content']}"
     except Exception as e:
-        await message.channel.send(f"❌ Lỗi khi xử lý ảnh: {str(e)}")
+        return f"❌ **Lỗi khi xử lý ảnh:** {str(e)}"
 
+# Lệnh !clear để xóa lịch sử chat trong kênh
+@bot.command()
+async def clear(ctx, amount: int = 100):
+    """Xóa tin nhắn trong kênh Chatbot"""
+    if ctx.channel.id == ALLOWED_CHANNEL_ID:
+        deleted = await ctx.channel.purge(limit=amount)
+        await ctx.send(f"🧹 **Đã xóa {len(deleted)} tin nhắn!**", delete_after=5)
+
+# Chạy bot
 bot.run(TOKEN)
