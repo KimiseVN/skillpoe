@@ -1,4 +1,6 @@
 discord.py
-pandas
-openpyxl
-asyncio
+aiohttp
+pytesseract
+Pillow
+openai
+dotenv
