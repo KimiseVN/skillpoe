@@ -53,7 +53,7 @@ async def process_image(message, attachment):
 
         # Gửi ảnh lên OpenAI API
         response = client.chat.completions.create(
-        model="gpt-4-turbo",  # 🔹 Cập nhật mô hình mới nhất
+        model="gpt-4o",  # 🔹 Cập nhật mô hình mới nhất
         messages=[
             {"role": "system", "content": "Bạn là một chuyên gia về Path of Exile 2."},
             {"role": "user", "content": [
