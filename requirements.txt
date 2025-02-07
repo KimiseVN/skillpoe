@@ -3,4 +3,4 @@ aiohttp
 pytesseract
 Pillow
 openai
-dotenv
+python-dotenv
