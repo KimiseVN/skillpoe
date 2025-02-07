@@ -1,10 +1,5 @@
 discord.py
-pandas
-openpyxl
-asyncio
-pytesseract
 pillow
 requests
-openai
-aiohttp
-python-dotenv
+pytesseract
+gunicorn
