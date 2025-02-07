@@ -10,7 +10,7 @@ TOKEN = os.getenv("DISCORD_POESKILL_BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("CHATGPT_API_KEY")
 
 # ID của kênh được phép bot hoạt động
-ALLOWED_CHANNEL_ID = 1337203470167576607  
+ALLOWED_CHANNEL_ID = 1337325317328736308  
 
 # Thiết lập intents cho bot
 intents = discord.Intents.default()
