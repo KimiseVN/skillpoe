@@ -6,3 +6,5 @@ pytesseract
 pillow
 requests
 openai
+aiohttp
+python-dotenv
