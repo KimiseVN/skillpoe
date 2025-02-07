@@ -1,7 +1,7 @@
 discord.py
-aiohttp
+pandas
+openpyxl
+asyncio
 pytesseract
-Pillow
-openai
-python-dotenv
-tesseract-ocr
+pillow
+requests
