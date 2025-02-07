@@ -1,83 +1,103 @@
 import os
 import discord
-import requests
 import pytesseract
+import openai
+import aiohttp
 from PIL import Image
-from io import BytesIO
 from discord.ext import commands
 
-# Lấy Token từ biến môi trường
-DISCORD_TOKEN = os.getenv("DISCORD_POESKILL_BOT_TOKEN")  # Token bot Discord
-CHATGPT_API_KEY = os.getenv("CHATGPT_API_KEY")  # API Key của ChatGPT
+# Cấu hình Token & API Key từ biến môi trường
+TOKEN = os.getenv("DISCORD_POESKILL_TOKEN")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# ID của kênh được phép bot hoạt động
-ALLOWED_CHANNEL_ID = 1337203470167576607  # Cập nhật Channel ID của bạn
+# ID của kênh Discord được phép sử dụng bot
+ALLOWED_CHANNEL_ID = 1337325317328736308  # Cập nhật ID kênh Discord của bạn
 
-# Thiết lập intents cho bot
+# Khởi tạo bot với intents phù hợp
 intents = discord.Intents.default()
 intents.message_content = True
-
-# Khởi tạo bot với prefix "!"
 bot = commands.Bot(command_prefix="!", intents=intents)
+
+# Cấu hình OpenAI API
+openai.api_key = OPENAI_API_KEY
+
+
+async def download_image(url, filename):
+    """Tải ảnh từ Discord về máy"""
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            if resp.status == 200:
+                with open(filename, 'wb') as f:
+                    f.write(await resp.read())
+                return filename
+    return None
+
+
+def extract_text_from_image(image_path):
+    """Dùng Tesseract OCR để trích xuất văn bản từ ảnh"""
+    img = Image.open(image_path)
+    extracted_text = pytesseract.image_to_string(img)
+    return extracted_text
+
+
+def get_skill_info_from_chatgpt(skill_name):
+    """Gửi tên Skill đến ChatGPT để lấy thông tin bằng tiếng Việt"""
+    prompt = f"Hãy giải thích về skill '{skill_name}' trong game Path of Exile bằng tiếng Việt."
+
+    response = openai.ChatCompletion.create(
+        model="gpt-4",
+        messages=[{"role": "system", "content": "Bạn là một chuyên gia về game Path of Exile."},
+                  {"role": "user", "content": prompt}],
+        max_tokens=200
+    )
+
+    return response["choices"][0]["message"]["content"]
+
 
 @bot.event
 async def on_ready():
     print(f'✅ POESkill Bot đã kết nối với Discord! Logged in as {bot.user}')
 
+
 @bot.event
 async def on_message(message):
-    """Xử lý tin nhắn và nhận diện Skill từ ảnh"""
-    if message.author == bot.user or message.channel.id != ALLOWED_CHANNEL_ID:
+    """Nhận diện ảnh & tìm Skill"""
+    if message.author == bot.user:
+        return
+    if message.channel.id != ALLOWED_CHANNEL_ID:
         return
 
-    # Xử lý ảnh nếu có ảnh đính kèm
     if message.attachments:
-        await process_image(message, message.attachments[0])
+        for attachment in message.attachments:
+            if attachment.filename.lower().endswith(("png", "jpg", "jpeg")):
+                image_path = f"./temp_{attachment.filename}"
+                await download_image(attachment.url, image_path)
+
+                extracted_text = extract_text_from_image(image_path)
+
+                # Tìm các dòng có chứa từ "Allocates" để lấy Skill
+                skill_names = [line.split("Allocates")[-1].strip() for line in extracted_text.split("\n") if "Allocates" in line]
+
+                if skill_names:
+                    response_message = "**🔍 Đã nhận diện các Skill từ ảnh:**\n"
+                    for skill in skill_names:
+                        skill_info = get_skill_info_from_chatgpt(skill)
+                        response_message += f"\n📌 **{skill}**\n{skill_info}\n"
+
+                    await message.channel.send(response_message)
+                else:
+                    await message.channel.send("❌ Không tìm thấy Skill nào trong ảnh!")
 
     await bot.process_commands(message)
 
-async def process_image(message, attachment):
-    """Trích xuất thông tin Skill từ ảnh và gửi truy vấn đến ChatGPT"""
-    try:
-        img_url = attachment.url
-        response = requests.get(img_url)
-        img = Image.open(BytesIO(response.content))
 
-        # Sử dụng Tesseract OCR để trích xuất văn bản
-        extracted_text = pytesseract.image_to_string(img)
-        print(f"🔍 OCR Extracted Text: {extracted_text}")  # Debugging
+@bot.command()
+async def clear(ctx, amount: int = 100):
+    """Xóa toàn bộ tin nhắn trong kênh Chatbot"""
+    if ctx.channel.id == ALLOWED_CHANNEL_ID:
+        deleted = await ctx.channel.purge(limit=amount)
+        await ctx.send(f"🧹 **Đã xóa {len(deleted)} tin nhắn trong kênh này!**", delete_after=5)
 
-        if extracted_text.strip():
-            # Gửi truy vấn đến ChatGPT để lấy thông tin bằng tiếng Việt
-            translated_info = get_skill_info_from_chatgpt(extracted_text)
-            await message.channel.send(f"📝 **Thông tin về Skill (Tiếng Việt):**\n{translated_info}")
-        else:
-            await message.channel.send("⚠️ Không thể trích xuất thông tin từ ảnh. Hãy thử ảnh khác!")
 
-    except Exception as e:
-        await message.channel.send(f"❌ Lỗi xử lý ảnh: {str(e)}")
-
-def get_skill_info_from_chatgpt(skill_text):
-    """Gửi truy vấn đến ChatGPT API và lấy câu trả lời bằng tiếng Việt"""
-    try:
-        headers = {
-            "Authorization": f"Bearer {CHATGPT_API_KEY}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "model": "gpt-4",
-            "messages": [{"role": "user", "content": f"Dịch và giải thích kỹ năng này từ Path of Exile sang tiếng Việt: {skill_text}"}],
-            "temperature": 0.7,
-        }
-
-        response = requests.post("https://api.openai.com/v1/chat/completions", json=payload, headers=headers)
-
-        if response.status_code == 200:
-            return response.json()["choices"][0]["message"]["content"]
-        else:
-            return f"⚠️ Lỗi khi truy vấn ChatGPT API: {response.text}"
-
-    except Exception as e:
-        return f"❌ Lỗi xử lý API: {str(e)}"
-
-bot.run(DISCORD_TOKEN)
+# Chạy bot
+bot.run(TOKEN)
