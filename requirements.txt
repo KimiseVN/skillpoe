@@ -4,3 +4,4 @@ pytesseract
 Pillow
 openai
 python-dotenv
+tesseract-ocr
