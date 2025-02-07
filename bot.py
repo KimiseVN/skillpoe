@@ -7,8 +7,8 @@ import openai
 import os
 
 # Lấy API Key từ biến môi trường trên Railway
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
+TOKEN = os.environ["DISCORD_BOT_TOKEN"]
 ALLOWED_CHANNEL_ID = 1337325317328736308  # ID của kênh được phép sử dụng bot
 
 if not OPENAI_API_KEY or not TOKEN:
