@@ -3,4 +3,4 @@ pillow
 requests
 pytesseract
 gunicorn
-openai
+openai>=1.0.0
