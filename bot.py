@@ -6,11 +6,11 @@ from io import BytesIO
 from discord.ext import commands
 
 # Lấy Token từ biến môi trường
-TOKEN = os.getenv("DISCORD_POESKILL_BOT_TOKEN")  # Cập nhật biến môi trường cho bot POESkill
+TOKEN = os.getenv("DISCORD_POESKILL_BOT_TOKEN")  
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # ID của kênh được phép bot hoạt động
-ALLOWED_CHANNEL_ID = 1337325317328736308  # Thay bằng ID kênh của bạn
+ALLOWED_CHANNEL_ID = 1337203470167576607  
 
 # Thiết lập intents cho bot
 intents = discord.Intents.default()
@@ -18,6 +18,9 @@ intents.message_content = True
 
 # Khởi tạo bot với prefix "!"
 bot = commands.Bot(command_prefix="!", intents=intents)
+
+# Cấu hình OpenAI API
+client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
 @bot.event
 async def on_ready():
@@ -49,20 +52,20 @@ async def process_image(message, attachment):
         img_file = BytesIO(img_data)
 
         # Gửi ảnh lên OpenAI API
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-4-vision-preview",
             messages=[
                 {"role": "system", "content": "Bạn là một chuyên gia về Path of Exile 2."},
                 {"role": "user", "content": [
                     {"type": "text", "text": "Hãy phân tích nội dung trong hình ảnh này và cho biết nó liên quan đến kỹ năng, vật phẩm, hoặc cơ chế nào trong Path of Exile 2."},
-                    {"type": "image", "image": img_file.getvalue()}
+                    {"type": "image_url", "image_url": {"url": attachment.url}}
                 ]}
             ],
             max_tokens=500
         )
 
         # Trích xuất câu trả lời
-        answer = response["choices"][0]["message"]["content"]
+        answer = response.choices[0].message.content
         await message.channel.send(f"🔎 **Phân tích hình ảnh:**\n{answer}")
 
     except Exception as e:
