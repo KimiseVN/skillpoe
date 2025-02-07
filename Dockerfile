@@ -1,17 +1,15 @@
-# Sử dụng Python mới nhất
-FROM python:3.10
+# Sử dụng base image có Python và Tesseract
+FROM python:3.12
 
 # Cập nhật hệ thống và cài đặt Tesseract OCR
-RUN apt-get update && apt-get install -y tesseract-ocr
+RUN apt-get update && apt-get install -y tesseract-ocr libtesseract-dev
 
-# Thiết lập thư mục làm việc
-WORKDIR /app
+# Cài đặt thư viện Python
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Sao chép toàn bộ mã nguồn vào container
 COPY . .
-
-# Cập nhật pip và cài đặt dependencies
-RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # Chạy bot
 CMD ["python", "bot.py"]
