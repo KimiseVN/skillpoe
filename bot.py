@@ -9,6 +9,7 @@ import os
 # Lấy API Key từ biến môi trường trên Railway
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+ALLOWED_CHANNEL_ID = 1337325317328736308  # ID của kênh được phép sử dụng bot
 
 if not OPENAI_API_KEY or not TOKEN:
     raise ValueError("❌ API Key hoặc Discord Token không tồn tại! Hãy thiết lập biến môi trường trên Railway.")
@@ -40,6 +41,10 @@ async def on_ready():
 @client.event
 async def on_message(message):
     if message.author == client.user:
+        return
+    
+    # Kiểm tra nếu bot hoạt động đúng kênh
+    if message.channel.id != ALLOWED_CHANNEL_ID:
         return
     
     # Kiểm tra nếu tin nhắn có hình ảnh
