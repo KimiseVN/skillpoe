@@ -53,15 +53,15 @@ async def process_image(message, attachment):
 
         # Gửi ảnh lên OpenAI API
         response = client.chat.completions.create(
-            model="gpt-4-vision-preview",
-            messages=[
-                {"role": "system", "content": "Bạn là một chuyên gia về Path of Exile 2."},
-                {"role": "user", "content": [
-                    {"type": "text", "text": "Hãy phân tích nội dung trong hình ảnh này và cho biết nó liên quan đến kỹ năng, vật phẩm, hoặc cơ chế nào trong Path of Exile 2."},
-                    {"type": "image_url", "image_url": {"url": attachment.url}}
-                ]}
+        model="gpt-4-turbo",  # 🔹 Cập nhật mô hình mới nhất
+        messages=[
+            {"role": "system", "content": "Bạn là một chuyên gia về Path of Exile 2."},
+            {"role": "user", "content": [
+                {"type": "text", "text": "Hãy phân tích nội dung trong hình ảnh này và cho biết nó liên quan đến kỹ năng, vật phẩm, hoặc cơ chế nào trong Path of Exile 2."},
+                {"type": "image_url", "image_url": {"url": attachment.url}}
+            ]}
             ],
-            max_tokens=500
+        max_tokens=500
         )
 
         # Trích xuất câu trả lời
