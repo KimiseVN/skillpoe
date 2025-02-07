@@ -7,7 +7,7 @@ from PIL import Image
 from discord.ext import commands
 
 # Cấu hình Token & API Key từ biến môi trường
-TOKEN = os.getenv("DISCORD_POESKILL_TOKEN")
+TOKEN = os.getenv("DISCORD_POESKILL_BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # ID của kênh Discord được phép sử dụng bot
