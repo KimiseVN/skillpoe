@@ -3,9 +3,6 @@ import discord
 import openai
 import aiohttp
 import io
-import re
-import pytesseract
-from PIL import Image, ImageEnhance, ImageFilter
 from discord.ext import commands
 
 # ✅ Lấy token từ biến môi trường
@@ -13,13 +10,10 @@ DISCORD_TOKEN = os.getenv("DISCORD_POESKILL_BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("CHATGPT_API_KEY")
 
 # 🔹 ID của kênh được phép bot hoạt động
-ALLOWED_CHANNEL_ID = 1337325317328736308  # Thay bằng ID kênh của bạn
+ALLOWED_CHANNEL_ID = 1337325317328736308  # Thay bằng ID kênh Discord của bạn
 
-# 🔹 Cấu hình OpenAI API
+# ✅ Cấu hình OpenAI API
 openai.api_key = OPENAI_API_KEY
-
-# 🔹 Cấu hình Tesseract OCR
-pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
 
 # ✅ Khởi tạo bot
 intents = discord.Intents.default()
@@ -32,47 +26,35 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 async def on_ready():
     print(f"✅ Bot {bot.user} đã sẵn sàng!")
 
-# 📌 Tiền xử lý ảnh trước khi chạy OCR
-def preprocess_image(image):
-    image = image.convert("L")  # Chuyển thành ảnh grayscale (đen trắng)
-    image = ImageEnhance.Contrast(image).enhance(2)  # Tăng độ tương phản
-    image = image.filter(ImageFilter.MedianFilter())  # Lọc nhiễu
-    return image
+# 📌 Gửi ảnh đến ChatGPT để phân tích
+async def analyze_image_with_chatgpt(image_url):
+    headers = {
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Content-Type": "application/json"
+    }
 
-# 📌 Hàm xử lý ảnh để trích xuất text
-async def extract_text_from_image(image_url):
+    # 🔹 Prompt yêu cầu ChatGPT phân tích ảnh như một chuyên gia POE2
+    prompt = """
+    Bạn là một chuyên gia về game Path of Exile 2. Tôi sẽ gửi cho bạn một hình ảnh, nhiệm vụ của bạn là phân tích nội dung của ảnh này và cung cấp thông tin chi tiết về các kỹ năng, vật phẩm hoặc nội dung liên quan đến game xuất hiện trong ảnh. 
+    Hãy giải thích rõ ràng về cách sử dụng, đặc điểm và tầm quan trọng của nội dung trong ảnh.
+    """
+
+    payload = {
+        "model": "gpt-4-turbo-vision",
+        "messages": [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": [{"type": "image_url", "image_url": image_url}]}
+        ],
+        "max_tokens": 1000
+    }
+
     async with aiohttp.ClientSession() as session:
-        async with session.get(image_url) as response:
+        async with session.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload) as response:
             if response.status == 200:
-                image_data = await response.read()
-                image = Image.open(io.BytesIO(image_data))
-                processed_image = preprocess_image(image)  # Xử lý ảnh trước khi OCR
-                extracted_text = pytesseract.image_to_string(processed_image, config="--psm 7 --oem 3")  # Trích xuất text từ ảnh
-                return extracted_text
+                response_data = await response.json()
+                return response_data["choices"][0]["message"]["content"]
             else:
-                return None
-
-# 📌 Hàm tìm tên Skill từ văn bản nhận diện
-def extract_skill_name(text):
-    lines = text.split("\n")
-    for line in lines:
-        cleaned_line = line.strip().replace("|", "").replace("-", "").replace("_", "").replace("'", "")  # Xử lý ký tự thừa
-        if re.match(r"^[A-Z][a-zA-Z\s]+$", cleaned_line):  # Chỉ lấy dòng có chữ cái đầu viết hoa
-            return cleaned_line
-    return None
-
-# 📌 Hàm gửi truy vấn tìm Skill đến ChatGPT
-async def query_chatgpt(skill_name):
-    prompt = f"Hãy cung cấp thông tin chi tiết về Skill '{skill_name}' trong game Path of Exile 2."
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7
-        )
-        return response["choices"][0]["message"]["content"]
-    except Exception as e:
-        return f"⚠️ Lỗi khi lấy dữ liệu từ ChatGPT: {e}"
+                return f"⚠️ Lỗi khi gửi ảnh đến ChatGPT: {response.status} - {await response.text()}"
 
 # 📌 Xử lý khi bot nhận tin nhắn có ảnh
 @bot.event
@@ -82,22 +64,11 @@ async def on_message(message):
 
     if message.attachments:
         await message.channel.send("📷 **Đang phân tích hình ảnh... Vui lòng chờ...**")
-        
+
         for attachment in message.attachments:
             if any(attachment.filename.lower().endswith(ext) for ext in ["png", "jpg", "jpeg"]):
-                extracted_text = await extract_text_from_image(attachment.url)
-
-                if extracted_text:
-                    skill_name = extract_skill_name(extracted_text)
-                    
-                    if skill_name:
-                        await message.channel.send(f"🔎 **Đang tìm thông tin Skill: {skill_name}**...")
-                        result = await query_chatgpt(skill_name)
-                        await message.channel.send(f"📌 **{skill_name}**\n{result}")
-                    else:
-                        await message.channel.send("❌ Không tìm thấy tên Skill nào trong ảnh.")
-                else:
-                    await message.channel.send("❌ Lỗi khi xử lý ảnh. Hãy thử lại.")
+                result = await analyze_image_with_chatgpt(attachment.url)
+                await message.channel.send(f"🔎 **Kết quả phân tích:**\n{result}")
 
     await bot.process_commands(message)
 
