@@ -40,7 +40,7 @@ async def analyze_image_with_chatgpt(image_url):
     """
 
     payload = {
-        "model": "gpt-4-turbo-vision",
+        "model": "gpt-4-turbo",
         "messages": [
             {"role": "system", "content": prompt},
             {"role": "user", "content": [{"type": "image_url", "image_url": image_url}]}
