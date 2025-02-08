@@ -84,7 +84,7 @@ async def on_message(message):
                     if skill_name:
                         await message.channel.send(f"🔎 **Đang tìm thông tin Skill: {skill_name}**...")
                         result = await query_chatgpt(skill_name)
-                        await message.channel.send(f"📌 **{skill_name}**\n```{result}```")
+                        await message.channel.send(f"📌 **{skill_name}**\n{result}")
                     else:
                         await message.channel.send("❌ Không tìm thấy tên Skill nào trong ảnh.")
                 else:
