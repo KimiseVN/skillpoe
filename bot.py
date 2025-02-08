@@ -5,6 +5,8 @@ import aiohttp
 import io
 import re
 import pytesseract
+import cv2
+import numpy as np
 from PIL import Image, ImageEnhance, ImageFilter
 from discord.ext import commands
 
@@ -34,10 +36,21 @@ async def on_ready():
 
 # 📌 Tiền xử lý ảnh trước khi chạy OCR
 def preprocess_image(image):
-    image = image.convert("L")  # Chuyển thành ảnh grayscale (đen trắng)
-    image = ImageEnhance.Contrast(image).enhance(2)  # Tăng độ tương phản
-    image = image.filter(ImageFilter.MedianFilter())  # Lọc nhiễu
-    return image
+    image = np.array(image)
+
+    # Chuyển ảnh về grayscale
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    # Áp dụng adaptive threshold để làm rõ chữ
+    gray = cv2.adaptiveThreshold(
+        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+    )
+
+    # Lọc nhiễu bằng Gaussian Blur
+    gray = cv2.GaussianBlur(gray, (3, 3), 0)
+
+    # Chuyển đổi lại thành ảnh PIL để OCR
+    return Image.fromarray(gray)
 
 # 📌 Hàm xử lý ảnh để trích xuất text
 async def extract_text_from_image(image_url):
@@ -47,7 +60,9 @@ async def extract_text_from_image(image_url):
                 image_data = await response.read()
                 image = Image.open(io.BytesIO(image_data))
                 processed_image = preprocess_image(image)  # Xử lý ảnh trước khi OCR
-                extracted_text = pytesseract.image_to_string(processed_image, config="--psm 7 --oem 3")  # Trích xuất text từ ảnh
+                extracted_text = pytesseract.image_to_string(
+                    processed_image, config="--psm 6 --oem 3"
+                )  # Trích xuất text từ ảnh
                 return extracted_text
             else:
                 return None
@@ -56,7 +71,13 @@ async def extract_text_from_image(image_url):
 def extract_skill_name(text):
     lines = text.split("\n")
     for line in lines:
-        cleaned_line = line.strip().replace("|", "").replace("-", "").replace("_", "").replace("'", "")  # Xử lý ký tự thừa
+        cleaned_line = (
+            line.strip()
+            .replace("|", "")
+            .replace("-", "")
+            .replace("_", "")
+            .replace("'", "")
+        )  # Xử lý ký tự thừa
         if re.match(r"^[A-Z][a-zA-Z\s]+$", cleaned_line):  # Chỉ lấy dòng có chữ cái đầu viết hoa
             return cleaned_line
     return None
@@ -68,7 +89,7 @@ async def query_chatgpt(skill_name):
         response = openai.ChatCompletion.create(
             model="gpt-4-turbo",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.7
+            temperature=0.7,
         )
         return response["choices"][0]["message"]["content"]
     except Exception as e:
@@ -82,14 +103,14 @@ async def on_message(message):
 
     if message.attachments:
         await message.channel.send("📷 **Đang phân tích hình ảnh... Vui lòng chờ...**")
-        
+
         for attachment in message.attachments:
             if any(attachment.filename.lower().endswith(ext) for ext in ["png", "jpg", "jpeg"]):
                 extracted_text = await extract_text_from_image(attachment.url)
 
                 if extracted_text:
                     skill_name = extract_skill_name(extracted_text)
-                    
+
                     if skill_name:
                         await message.channel.send(f"🔎 **Đang tìm thông tin Skill: {skill_name}**...")
                         result = await query_chatgpt(skill_name)
