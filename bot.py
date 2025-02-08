@@ -55,7 +55,7 @@ async def on_message(message):
 async def analyze_image(image_url):
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-4o",  # Sử dụng model có hỗ trợ hình ảnh
+            model="gpt-4-turbo",  # Sử dụng model có hỗ trợ hình ảnh
             messages=[
                 {"role": "system", "content": "Bạn là trợ lý chuyên tìm kiếm thông tin về game Path of Exile 2."},
                 {"role": "user", "content": f"Hãy phân tích và cho tôi biết thông tin của hình ảnh này trong game POE2: {image_url}"}
