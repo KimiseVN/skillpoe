@@ -1,6 +1,5 @@
 import os
 import discord
-import aiohttp
 import openai
 from discord.ext import commands
 
@@ -22,6 +21,7 @@ openai.api_key = OPENAI_API_KEY
 async def process_image(image_url):
     """Gửi ảnh lên OpenAI GPT-4 Turbo để phân tích"""
     try:
+        print(f"📤 Đang gửi ảnh đến OpenAI: {image_url}")  # Debug log
         response = openai.ChatCompletion.create(
             model="gpt-4-turbo",
             messages=[
@@ -32,15 +32,25 @@ async def process_image(image_url):
                 ]}
             ]
         )
-        return response["choices"][0]["message"]["content"]
+        result = response["choices"][0]["message"]["content"]
+        print(f"✅ Kết quả từ OpenAI:\n{result}")  # Debug log
+        return result
     except openai.error.OpenAIError as e:
+        print(f"⚠️ Lỗi OpenAI: {e}")  # Debug log
         return f"⚠️ Lỗi khi gửi ảnh đến ChatGPT: {e}"
+
+@bot.event
+async def on_ready():
+    """Thông báo khi bot sẵn sàng"""
+    print(f"✅ Bot đã kết nối với Discord! Logged in as {bot.user}")
 
 @bot.event
 async def on_message(message):
     """Xử lý khi có người gửi ảnh"""
     if message.author == bot.user or message.channel.id != ALLOWED_CHANNEL_ID:
         return
+
+    print(f"📨 Nhận tin nhắn từ {message.author}: {message.content}")  # Debug log
 
     if message.attachments:
         for attachment in message.attachments:
