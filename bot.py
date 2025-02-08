@@ -46,21 +46,22 @@ async def on_ready():
 
 @bot.event
 async def on_message(message):
-    """Xử lý khi có người gửi ảnh"""
-    if message.author == bot.user or message.channel.id != ALLOWED_CHANNEL_ID:
-        return
-
+    """Xử lý tin nhắn và in logs để debug"""
     print(f"📨 Nhận tin nhắn từ {message.author}: {message.content}")  # Debug log
+
+    if message.author == bot.user:
+        return
 
     if message.attachments:
         for attachment in message.attachments:
-            if attachment.url.endswith(("png", "jpg", "jpeg")):  # Chỉ nhận ảnh
-                await message.channel.send("📤 **Đang phân tích hình ảnh... Vui lòng chờ...**")
-                result = await process_image(attachment.url)
-                await message.channel.send(f"🔎 **Kết quả phân tích:**\n{result}")
-                return
+            print(f"📷 Nhận ảnh từ {message.author}: {attachment.url}")  # Debug log
+            await message.channel.send("📤 **Đang phân tích hình ảnh... Vui lòng chờ...**")
+            result = await process_image(attachment.url)
+            await message.channel.send(f"🔎 **Kết quả phân tích:**\n{result}")
+            return
 
-    await bot.process_commands(message)  # Xử lý các lệnh khác nếu có
+    await bot.process_commands(message)  # Xử lý lệnh khác nếu có
+
 
 # Khởi chạy bot
 bot.run(DISCORD_TOKEN)
