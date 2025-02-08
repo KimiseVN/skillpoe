@@ -1,5 +1,4 @@
 discord.py
-pillow
-requests
-pytesseract
 openai==0.28
+aiohttp
+python-dotenv
