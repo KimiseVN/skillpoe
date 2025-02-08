@@ -5,7 +5,7 @@ import aiohttp
 import io
 import re
 import pytesseract
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter
 from discord.ext import commands
 
 # ✅ Lấy token từ biến môi trường
@@ -18,7 +18,7 @@ ALLOWED_CHANNEL_ID = 1337325317328736308  # Thay bằng ID kênh của bạn
 # 🔹 Cấu hình OpenAI API
 openai.api_key = OPENAI_API_KEY
 
-# 🔹 Cấu hình Tesseract OCR (Railway không cần chỉ định đường dẫn)
+# 🔹 Cấu hình Tesseract OCR
 pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
 
 # ✅ Khởi tạo bot
@@ -32,6 +32,13 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 async def on_ready():
     print(f"✅ Bot {bot.user} đã sẵn sàng!")
 
+# 📌 Tiền xử lý ảnh trước khi chạy OCR
+def preprocess_image(image):
+    image = image.convert("L")  # Chuyển thành ảnh grayscale (đen trắng)
+    image = ImageEnhance.Contrast(image).enhance(2)  # Tăng độ tương phản
+    image = image.filter(ImageFilter.MedianFilter())  # Lọc nhiễu
+    return image
+
 # 📌 Hàm xử lý ảnh để trích xuất text
 async def extract_text_from_image(image_url):
     async with aiohttp.ClientSession() as session:
@@ -39,7 +46,8 @@ async def extract_text_from_image(image_url):
             if response.status == 200:
                 image_data = await response.read()
                 image = Image.open(io.BytesIO(image_data))
-                extracted_text = pytesseract.image_to_string(image, lang='eng')  # Trích xuất text từ ảnh
+                processed_image = preprocess_image(image)  # Xử lý ảnh trước khi OCR
+                extracted_text = pytesseract.image_to_string(processed_image, config="--psm 7 --oem 3")  # Trích xuất text từ ảnh
                 return extracted_text
             else:
                 return None
@@ -48,13 +56,14 @@ async def extract_text_from_image(image_url):
 def extract_skill_name(text):
     lines = text.split("\n")
     for line in lines:
-        if re.match(r"^[A-Z][a-zA-Z\s]+$", line.strip()):  # Chỉ lấy dòng có chữ cái đầu viết hoa (Tên Skill)
-            return line.strip()
+        cleaned_line = line.strip().replace("|", "").replace("-", "").replace("_", "").replace("'", "")  # Xử lý ký tự thừa
+        if re.match(r"^[A-Z][a-zA-Z\s]+$", cleaned_line):  # Chỉ lấy dòng có chữ cái đầu viết hoa
+            return cleaned_line
     return None
 
 # 📌 Hàm gửi truy vấn tìm Skill đến ChatGPT
 async def query_chatgpt(skill_name):
-    prompt = f"Trong vai trò một người am hiểu về game Path of Exile 2, hãy cung cấp thông tin giải thích về Skill '{skill_name}'."
+    prompt = f"Hãy cung cấp thông tin chi tiết về Skill '{skill_name}' trong game Path of Exile 2."
     try:
         response = openai.ChatCompletion.create(
             model="gpt-4-turbo",
